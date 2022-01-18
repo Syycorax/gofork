@@ -16,6 +16,14 @@ type Repo_info struct {
 	Fork_url    string `json:"forks_url"`
 }
 
+type Fork_info struct {
+	Forks []struct {
+		Fork_url  string `json:"html_url"`
+		Author    string `json:"owner.login"`
+		Full_name string `json:"full_name"`
+	}
+}
+
 func Error(err error) {
 	if err != nil {
 		log.Fatal(err)
@@ -25,6 +33,7 @@ func Error(err error) {
 func main() {
 	var (
 		repo_info Repo_info
+		fork_info Fork_info
 	)
 	fail := "[X]"
 	success := "[✓]"
@@ -47,6 +56,18 @@ func main() {
 			color.Red.Println(fail + " No forks found")
 		} else {
 			color.Green.Println(success, repo_info.Forks_count, "Forks found")
+			url = "http://api.github.com/repos/" + repo + "/forks"
+			req, _ = http.NewRequest("GET", url, nil)
+			resp, err = http.DefaultClient.Do(req)
+			Error(err)
+			defer resp.Body.Close()
+			body, _ = ioutil.ReadAll(resp.Body)
+			json_response = string(body)
+			json.Unmarshal([]byte(json_response), &fork_info)
+			for _, fork := range fork_info.Forks {
+				fmt.Println(fork.Fork_url)
+			}
+
 		}
 	}
 
