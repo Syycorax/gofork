@@ -34,6 +34,7 @@ func main() {
 	var (
 		repo_info Repo_info
 		fork_info Fork_info
+		//forks Fork_info
 	)
 	fail := "[X]"
 	success := "[✓]"
@@ -63,9 +64,13 @@ func main() {
 			defer resp.Body.Close()
 			body, _ = ioutil.ReadAll(resp.Body)
 			json_response = string(body)
+			fmt.Printf("%s\n", json_response)
 			json.Unmarshal([]byte(json_response), &fork_info)
-			for _, fork := range fork_info.Forks {
-				fmt.Println(fork.Fork_url)
+			f, _ := os.Create("data.txt")
+			defer f.Close()
+			_,_ = f.WriteString(string(json_response))
+			for range fork_info.Forks {
+				//fmt.Printf("%s %s %s\n", success, forks.Author, forks.Fork_url)
 			}
 
 		}
