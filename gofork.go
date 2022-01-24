@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/list"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -66,6 +67,10 @@ func main() {
 			resp, _ = http.DefaultClient.Do(req)
 			body, _ = ioutil.ReadAll(resp.Body)
 			json.Unmarshal(body, &forks)
+			ahead := list.New()
+			behind := list.New()
+			even := list.New()
+			private := list.New()
 			for _, fork := range forks {
 				url = "https://api.github.com/repos/" + fork.Full_name + "/compare/" + repo_info.Owner.Login + ":master...master"
 				req, _ = http.NewRequest("GET", url, nil)
@@ -74,14 +79,27 @@ func main() {
 				body, _ = ioutil.ReadAll(resp.Body)
 				json.Unmarshal(body, &fork)
 				if fork.Status == "ahead" {
-					color.Green.Println(success, fork.Full_name, "ahead by", fork.Ahead_by, "commits")
+					ahead.PushBack(fork)
 				} else if fork.Status == "behind" {
-					color.Red.Println(fail, fork.Full_name, "behind by", fork.Behind_by, "commits")
+					behind.PushBack(fork)
 				} else if fork.Status == "identical" {
-					color.Yellow.Println(fail, fork.Full_name, "up to date")
+					even.PushBack(fork)
 				} else {
-					color.Blue.Println(fail, fork.Full_name, "Fork is private")
+					private.PushBack(fork)
 				}
+			}
+			for e := ahead.Front(); e != nil; e = e.Next() {
+				color.Green.Println(success, e.Value.(Fork).Full_name, "is", e.Value.(Fork).Ahead_by, "commits ahead ")
+
+			}
+			for e := behind.Front(); e != nil; e = e.Next() {
+				color.Red.Println(fail, e.Value.(Fork).Full_name, "is", e.Value.(Fork).Behind_by, "commits behind ")
+			}
+			for e := even.Front(); e != nil; e = e.Next() {
+				color.Yellow.Println(fail, e.Value.(Fork).Full_name, "is up to date")
+			}
+			for e := private.Front(); e != nil; e = e.Next() {
+				color.Blue.Println(fail, e.Value.(Fork).Full_name, "is private")
 			}
 		}
 	}
