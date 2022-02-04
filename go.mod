@@ -2,7 +2,10 @@ module github.com/syycorax/gofork
 
 go 1.17
 
-require github.com/gookit/color v1.5.0
+require (
+	github.com/akamensky/argparse v1.3.1
+	github.com/gookit/color v1.5.0
+)
 
 require (
 	github.com/xo/terminfo v0.0.0-20210125001918-ca9a967f8778 // indirect
