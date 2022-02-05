@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 
 	"github.com/akamensky/argparse"
@@ -14,8 +15,9 @@ import (
 )
 
 type Repo_info struct {
-	Fork_count int `json:"forks_count"`
-	Owner      Owner
+	Fork_count     int `json:"forks_count"`
+	Owner          Owner
+	Default_branch string `json:"default_branch"`
 }
 
 type Owner struct {
@@ -50,28 +52,43 @@ func main() {
 	err := parser.Parse(os.Args)
 	if err != nil {
 		fmt.Print(parser.Usage(err))
+		os.Exit(1)
 	}
-	fmt.Println(*repo)
-	fmt.Println(*branch)
+	platform := runtime.GOOS
 	dat, _ := os.ReadFile("./config.json")
 	json.Unmarshal([]byte(dat), &auth)
-	fmt.Println(working + " Looking for " + *repo + " on branch " + *branch)
+	color.Notice.Println(working + " Looking for " + *repo + " on branch " + *branch)
 	url := "https://api.github.com/repos/" + *repo
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", "token "+string(auth.Token))
 	resp, _ := http.DefaultClient.Do(req)
 	if resp.StatusCode == http.StatusNotFound {
-		color.Red.Println(fail + " Repository not found")
+		if platform == "windows" {
+			color.Error.Print(fail + " Repository not found")
+		} else {
+			color.Error.Print(fail + " Repository not found\n")
+		}
 	} else if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
-		color.Red.Printf(fail + " Incorrect PAT or no PAT provided (see config.json.example)")
+		if platform == "windows" {
+			color.Error.Print(fail + " Incorrect PAT or no PAT provided (see config.json.example)")
+		} else {
+			color.Error.Print(fail + " Incorrect PAT or no PAT provided (see config.json.example)\n")
+		}
 	} else {
-		color.Green.Println(success + " Repository found")
+		color.Success.Println(success + " Repository found")
 		body, _ := ioutil.ReadAll(resp.Body)
 		json.Unmarshal(body, &repo_info)
 		if repo_info.Fork_count == 0 {
-			color.Red.Println(fail + " No forks found")
+			if platform == "windows" {
+				color.Error.Print(fail + " No forks found")
+			} else {
+				color.Error.Print(fail + " No forks found \n")
+			}
 		} else {
-			color.Green.Println(success, repo_info.Fork_count, "Forks found")
+			color.Success.Println(success, repo_info.Fork_count, "Forks found")
+			if repo_info.Fork_count > 100 {
+				color.Info.Println(mitigate + " More than 100 forks found, only showing first 100")
+			}
 			url = "https://api.github.com/repos/" + *repo + "/forks?per_page=" + strconv.Itoa(repo_info.Fork_count)
 			req, _ = http.NewRequest("GET", url, nil)
 			req.Header.Add("Authorization", "token "+string(auth.Token))
@@ -103,20 +120,22 @@ func main() {
 				}
 			}
 			for e := ahead.Front(); e != nil; e = e.Next() {
-				color.Green.Println(success, e.Value.(Fork).Full_name, "is", e.Value.(Fork).Ahead_by, "commits ahead ")
-
+				color.Success.Println(success, e.Value.(Fork).Full_name, "is", e.Value.(Fork).Ahead_by, "commits ahead ")
 			}
 			for e := diverge.Front(); e != nil; e = e.Next() {
-				color.HEX("#ff2a00").Println(mitigate, e.Value.(Fork).Full_name, "is", e.Value.(Fork).Ahead_by, "commits ahead and", e.Value.(Fork).Behind_by, "commits behind")
+				color.Warn.Println(mitigate, e.Value.(Fork).Full_name, "is", e.Value.(Fork).Ahead_by, "commits ahead and", e.Value.(Fork).Behind_by, "commits behind")
 			}
 			for e := behind.Front(); e != nil; e = e.Next() {
-				color.Red.Println(fail, e.Value.(Fork).Full_name, "is", e.Value.(Fork).Behind_by, "commits behind ")
+				color.Error.Println(fail, e.Value.(Fork).Full_name, "is", e.Value.(Fork).Behind_by, "commits behind ")
 			}
 			for e := even.Front(); e != nil; e = e.Next() {
-				color.Yellow.Println(fail, e.Value.(Fork).Full_name, "is up to date")
+				color.Danger.Println(fail, e.Value.(Fork).Full_name, "is up to date")
 			}
 			for e := private.Front(); e != nil; e = e.Next() {
-				color.Blue.Println(fail, e.Value.(Fork).Full_name, "has no branch master or is private")
+				color.Question.Println(fail, e.Value.(Fork).Full_name, "has no branch "+*branch+" or is private")
+			}
+			if ahead.Len() == 0 && behind.Len() == 0 && even.Len() == 0 && *branch == "master" {
+				color.Error.Println(fail, "No forks found on branch master, maybe try with main?")
 			}
 		}
 	}
