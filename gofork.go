@@ -113,7 +113,7 @@ func main() {
 				req, _ = http.NewRequest("GET", url, nil)
 				req.Header.Add("Authorization", "token "+string(auth.Token))
 				resp, _ = http.DefaultClient.Do(req)
-				body, _ = ioutil.ReadAll(resp.Body)	
+				body, _ = ioutil.ReadAll(resp.Body)
 				json.Unmarshal(body, &fork)
 				if fork.Status == "ahead" {
 					ahead.PushBack(fork)
