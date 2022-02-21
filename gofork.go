@@ -3,7 +3,6 @@ package main
 import (
 	"container/list"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -52,9 +51,10 @@ func main() {
 	repo := parser.String("r", "repo", &argparse.Options{Required: true, Help: "Repository to check"}) //TODO: No flag just default arg
 	branch := parser.String("b", "branch", &argparse.Options{Required: false, Help: "Branch to check", Default: "repo default branch"})
 	verboseflag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show private and up to date repositories"})
+	page := parser.Int("p", "page", &argparse.Options{Help: "Page to check", Default: 1, Required: false})
 	err := parser.Parse(os.Args)
 	if err != nil {
-		fmt.Print(parser.Usage(err))
+		color.Error.Println(parser.Usage(err))
 		os.Exit(1)
 	}
 	platform := runtime.GOOS
@@ -93,11 +93,18 @@ func main() {
 			}
 		} else {
 			color.Success.Println(success, RepoInfo.ForkCount, "Forks found")
-			if RepoInfo.ForkCount > 100 {
+			if RepoInfo.ForkCount > 100 && *page == 1 {
 				RepoInfo.ForkCount = 100
-				color.Info.Println(mitigate + " More than 100 forks found, only showing first 100") //TODO: Add pagination
+				color.Info.Println(mitigate + " More than 100 forks found, only showing first 100 (use -p to get other results)")
+			}
+			if RepoInfo.ForkCount > 100 && *page > 1 {
+				RepoInfo.ForkCount = 100
+				color.Info.Println(mitigate + " More than 100 forks found, showing page " + strconv.Itoa(*page))
 			}
 			url = "https://api.github.com/repos/" + *repo + "/forks?per_page=" + strconv.Itoa(RepoInfo.ForkCount)
+			if *page != 1 {
+				url = url + "&page=" + strconv.Itoa(*page)
+			}
 			req, _ = http.NewRequest("GET", url, nil)
 			req.Header.Add("Authorization", "token "+string(auth.Token))
 			resp, _ = http.DefaultClient.Do(req)
