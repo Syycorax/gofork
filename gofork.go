@@ -94,6 +94,7 @@ func main() {
 		} else {
 			color.Success.Println(success, RepoInfo.ForkCount, "Forks found")
 			if RepoInfo.ForkCount > 100 {
+				RepoInfo.ForkCount = 100
 				color.Info.Println(mitigate + " More than 100 forks found, only showing first 100") //TODO: Add pagination
 			}
 			url = "https://api.github.com/repos/" + *repo + "/forks?per_page=" + strconv.Itoa(RepoInfo.ForkCount)
@@ -127,6 +128,30 @@ func main() {
 					private.PushBack(fork)
 				}
 				bar.Add(1)
+			}
+			// sort ahead by ahead_by descending
+			for e := ahead.Front(); e != nil; e = e.Next() {
+				for f := e.Next(); f != nil; f = f.Next() {
+					if e.Value.(Fork).AheadBy < f.Value.(Fork).AheadBy {
+						e.Value, f.Value = f.Value, e.Value
+					}
+				}
+			}
+			// sort behind by behind_by ascending
+			for e := behind.Front(); e != nil; e = e.Next() {
+				for f := e.Next(); f != nil; f = f.Next() {
+					if e.Value.(Fork).BehindBy > f.Value.(Fork).BehindBy {
+						e.Value, f.Value = f.Value, e.Value
+					}
+				}
+			}
+			// sort diverge by ahead_by descending
+			for e := diverge.Front(); e != nil; e = e.Next() {
+				for f := e.Next(); f != nil; f = f.Next() {
+					if e.Value.(Fork).AheadBy < f.Value.(Fork).AheadBy {
+						e.Value, f.Value = f.Value, e.Value
+					}
+				}
 			}
 			aheadtable := tablewriter.NewWriter(os.Stdout)
 			aheadtable.SetHeader([]string{"Fork", "Ahead by", "URL"})
