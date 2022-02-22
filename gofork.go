@@ -63,7 +63,7 @@ func main() {
 	dat, _ := os.ReadFile("./config.json")
 	json.Unmarshal([]byte(dat), &auth)
 	if auth.Token == "" {
-		color.Error.Println("Please provide a PAT (https://github.com/settings/tokens) (no scope required)")
+		color.Error.Println("Please provide a PAT (https://tinyurl.com/GITHUBPAT) (no scope required)")
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
 		if platform == "windows" {
