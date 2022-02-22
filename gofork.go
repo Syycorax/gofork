@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"container/list"
 	"encoding/json"
 	"io/ioutil"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/akamensky/argparse"
 	"github.com/gookit/color"
@@ -48,7 +50,7 @@ func main() {
 	working := "[+]"
 	mitigate := "[~]"
 	parser := argparse.NewParser("gofork", "CLI tool to find active forks")
-	repo := parser.String("r", "repo", &argparse.Options{Required: true, Help: "Repository to check"}) //TODO: No flag just default arg
+	repo := parser.String("r", "repo", &argparse.Options{Required: false, Help: "Repository to check"})
 	branch := parser.String("b", "branch", &argparse.Options{Required: false, Help: "Branch to check", Default: "repo default branch"})
 	verboseflag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show private and up to date repositories"})
 	page := parser.Int("p", "page", &argparse.Options{Help: "Page to check", Default: 1, Required: false})
@@ -60,6 +62,25 @@ func main() {
 	platform := runtime.GOOS
 	dat, _ := os.ReadFile("./config.json")
 	json.Unmarshal([]byte(dat), &auth)
+	if auth.Token == "" {
+		color.Error.Println("Please provide a PAT (https://github.com/settings/tokens) (no scope required)")
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		if platform == "windows" {
+			input = strings.Replace(input, "\r\n", "", -1)
+		} else {
+			input = strings.Replace(input, "\n", "", -1)
+		}
+		output := "{\"PAT\": \"" + input + "\"}"
+		ioutil.WriteFile("./config.json", []byte(output), 0644)
+		color.Success.Println("PAT saved")
+		dat, _ := os.ReadFile("./config.json")
+		json.Unmarshal([]byte(dat), &auth)
+	}
+	if *repo == "" {
+		color.Error.Println("Please provide a repository")
+		os.Exit(1)
+	}
 	color.Notice.Println(working + " Looking for " + *repo)
 	url := "https://api.github.com/repos/" + *repo
 	req, _ := http.NewRequest("GET", url, nil)
@@ -72,10 +93,26 @@ func main() {
 			color.Error.Print(fail + " Repository not found\n")
 		}
 	} else if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
+		color.Error.Println(fail + " Incorrect PAT, do you want to delete config file? (y/n)")
+
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
 		if platform == "windows" {
-			color.Error.Print(fail + " Incorrect PAT or no PAT provided (see config.json.example)")
+			input = strings.Replace(input, "\r\n", "", -1)
 		} else {
-			color.Error.Print(fail + " Incorrect PAT or no PAT provided (see config.json.example)\n")
+			input = strings.Replace(input, "\n", "", -1)
+		}
+		if input == "y" {
+			os.Remove("./config.json")
+			color.Success.Println("PAT deleted")
+			os.Exit(1)
+		} else {
+			if platform == "windows" {
+				color.Error.Println("Incorrect PAT provided exiting")
+			} else {
+				color.Error.Print("Incorrect PAT provided exiting\n")
+			}
+			os.Exit(1)
 		}
 	} else {
 		color.Success.Println(success + " Repository found")
