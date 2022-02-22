@@ -22,7 +22,7 @@ Arguments:
 * [x] Use terminal colors
 * [x] Verbose flag for private/even forks
 * [x] Loading bar
-* [ ] Sort output
+* [X] Sort output
 ## Built with
 Built with love using [Golang](https://golang.org), [Github API](https://developer.github.com/v3/) and [akamensky's argparse](github.com/akamensky/argparse), [gookit's color](github.com/gookit/color) [olekukonko's tablewriter](github.com/olekukonko/tablewriter) libraries.
 
