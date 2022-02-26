@@ -47,13 +47,14 @@ func main() {
 	)
 	fail := "[X]"
 	success := "[✓]"
+	warning := "[!]"
 	working := "[+]"
 	mitigate := "[~]"
 	parser := argparse.NewParser("gofork", "CLI tool to find active forks")
 	repo := parser.String("r", "repo", &argparse.Options{Required: false, Help: "Repository to check"})
 	branch := parser.String("b", "branch", &argparse.Options{Required: false, Help: "Branch to check", Default: "repo default branch"})
 	verboseflag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show private and up to date repositories"})
-	page := parser.Int("p", "page", &argparse.Options{Help: "Page to check", Default: 1, Required: false})
+	page := parser.Int("p", "page", &argparse.Options{Help: "Page to check (use -1 for all)", Default: 1, Required: false})
 	err := parser.Parse(os.Args)
 	if err != nil {
 		color.Error.Println(parser.Usage(err))
@@ -130,48 +131,75 @@ func main() {
 			}
 		} else {
 			color.Success.Println(success, RepoInfo.ForkCount, "Forks found")
+			// Temporary variable to avoid avoid repetitions
+			pagesDecimal := float64(RepoInfo.ForkCount) / float64(100)
+			// The total number of pages
+			pages := RepoInfo.ForkCount / 100
+			if pagesDecimal != float64(int(pagesDecimal)) {
+				pages = int(pages) + 1
+			}
+			if *page > pages {
+				color.Warn.Println(warning + " The page is out of range (max. " + strconv.Itoa(pages) + "), showing page 1")
+				*page = 1
+			}
+			// This is separate from the above if because of it crashes if there is less than 100 forks
+			if *page < 1 {
+				if *page != -1 {
+					color.Warn.Println(warning + " The number of page is lower than 1, showing page 1")
+					pages = 1
+					RepoInfo.ForkCount = 100
+				}
+				*page = 1
+			}
 			if RepoInfo.ForkCount > 100 && *page == 1 {
 				RepoInfo.ForkCount = 100
+				// Force the loop to iterate over the selected page only
+				pages = *page
 				color.Info.Println(mitigate + " More than 100 forks found, only showing first 100 (use -p to get other results)")
 			}
 			if RepoInfo.ForkCount > 100 && *page > 1 {
 				RepoInfo.ForkCount = 100
+				// Force the loop to iterate over the selected page only
+				pages = *page
 				color.Info.Println(mitigate + " More than 100 forks found, showing page " + strconv.Itoa(*page))
 			}
-			url = "https://api.github.com/repos/" + *repo + "/forks?per_page=" + strconv.Itoa(RepoInfo.ForkCount)
-			if *page != 1 {
-				url = url + "&page=" + strconv.Itoa(*page)
+			if RepoInfo.ForkCount > 100 && *page == -1 {
+				color.Info.Println(mitigate + " More than 100 forks found, showing page all pages because -p is used with -1")
 			}
-			req, _ = http.NewRequest("GET", url, nil)
-			req.Header.Add("Authorization", "token "+string(auth.Token))
-			resp, _ = http.DefaultClient.Do(req)
-			body, _ = ioutil.ReadAll(resp.Body)
-			json.Unmarshal(body, &forks)
 			ahead := list.New()
 			behind := list.New()
 			diverge := list.New()
 			even := list.New()
 			private := list.New()
 			bar := progressbar.Default(int64(RepoInfo.ForkCount))
-			for _, fork := range forks {
-				url = "https://api.github.com/repos/" + fork.FullName + "/compare/" + RepoInfo.Owner.Login + ":" + *branch + "..." + *branch
+			for page := *page; page < pages+1; page++ {
+				url = "https://api.github.com/repos/" + *repo + "/forks?per_page=" + strconv.Itoa(RepoInfo.ForkCount)
+				url = url + "&page=" + strconv.Itoa(page)
 				req, _ = http.NewRequest("GET", url, nil)
 				req.Header.Add("Authorization", "token "+string(auth.Token))
 				resp, _ = http.DefaultClient.Do(req)
 				body, _ = ioutil.ReadAll(resp.Body)
-				json.Unmarshal(body, &fork)
-				if fork.Status == "ahead" {
-					ahead.PushBack(fork)
-				} else if fork.Status == "behind" {
-					behind.PushBack(fork)
-				} else if fork.Status == "identical" {
-					even.PushBack(fork)
-				} else if fork.Status == "diverged" {
-					diverge.PushBack(fork)
-				} else {
-					private.PushBack(fork)
+				json.Unmarshal(body, &forks)
+				for _, fork := range forks {
+					url = "https://api.github.com/repos/" + fork.FullName + "/compare/" + RepoInfo.Owner.Login + ":" + *branch + "..." + *branch
+					req, _ = http.NewRequest("GET", url, nil)
+					req.Header.Add("Authorization", "token "+string(auth.Token))
+					resp, _ = http.DefaultClient.Do(req)
+					body, _ = ioutil.ReadAll(resp.Body)
+					json.Unmarshal(body, &fork)
+					if fork.Status == "ahead" {
+						ahead.PushBack(fork)
+					} else if fork.Status == "behind" {
+						behind.PushBack(fork)
+					} else if fork.Status == "identical" {
+						even.PushBack(fork)
+					} else if fork.Status == "diverged" {
+						diverge.PushBack(fork)
+					} else {
+						private.PushBack(fork)
+					}
+					bar.Add(1)
 				}
-				bar.Add(1)
 			}
 			// sort ahead by ahead_by descending
 			for e := ahead.Front(); e != nil; e = e.Next() {
