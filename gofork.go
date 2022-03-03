@@ -142,15 +142,6 @@ func main() {
 				color.Warn.Println(warning + " The page is out of range (max. " + strconv.Itoa(pages) + "), showing page 1")
 				*page = 1
 			}
-			// This is separate from the above if because of it crashes if there is less than 100 forks
-			if *page < 1 {
-				if *page != -1 {
-					color.Warn.Println(warning + " The number of page is lower than 1, showing page 1")
-					pages = 1
-					RepoInfo.ForkCount = 100
-				}
-				*page = 1
-			}
 			if RepoInfo.ForkCount > 100 && *page == 1 {
 				RepoInfo.ForkCount = 100
 				// Force the loop to iterate over the selected page only
@@ -165,6 +156,14 @@ func main() {
 			}
 			if RepoInfo.ForkCount > 100 && *page == -1 {
 				color.Info.Println(mitigate + " More than 100 forks found, showing page all pages because -p is used with -1")
+			}
+			if *page < 1 {
+				if *page != -1 {
+					color.Warn.Println(warning + " The number of page is lower than 1, showing page 1")
+					pages = 1
+					RepoInfo.ForkCount = 100
+				}
+				*page = 1
 			}
 			ahead := list.New()
 			behind := list.New()
