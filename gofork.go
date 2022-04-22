@@ -307,10 +307,7 @@ func writeConfig(token string) {
 		color.Success.Println("Token written to config file " + ConfigFilePath)
 	} else {
 		path, cfp := getConfigFilePath()
-		a := os.MkdirAll(path, 0777)
-		if a != nil {
-			color.Error.Println(a)
-		}
+		os.MkdirAll(path, 0777)
 		ioutil.WriteFile(cfp, []byte(token), 0644)
 		color.Success.Println("Token written to config file " + cfp)
 
