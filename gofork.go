@@ -62,9 +62,11 @@ func main() {
 	}
 	auth.Token = readConfig()
 	if auth.Token == "" {
-		platformPrint(color.Error, "Please provide a PAT (https://tinyurl.com/GITHUBPAT) (Don't allow any scope, the token is stored in PLAINTEXT")
+		// TODO: don't store token in plaintext
+		platformPrint(color.Error, "Please provide a PAT (https://tinyurl.com/GITHUBPAT) (Don't allow any scope, the token is stored in PLAINTEXT)")
 		input := getInput()
 		output := "{\"PAT\": \"" + input + "\"}"
+		platformPrint(color.Success, output)
 		writeConfig(output)
 		platformPrint(color.Success, "PAT saved")
 		auth.Token = readConfig()
@@ -80,12 +82,15 @@ func main() {
 	} else if RepoCheck(*repo, auth.Token) == 2 {
 		platformPrint(color.Error, fail+" Incorrect PAT, do you want to delete config file? (y/n)")
 		input := getInput()
-		if input == "y" {
+		if input == "y" || input == "Y" {
 			deleteConfig()
 			platformPrint(color.Success, "PAT deleted")
 			os.Exit(1)
-		} else {
+		} else if input == "n" || input == "N" {
 			platformPrint(color.Error, "Incorrect PAT provided exiting")
+			os.Exit(1)
+		} else {
+			platformPrint(color.Error, "Incorrect input provided exiting")
 			os.Exit(1)
 		}
 	} else {
@@ -266,19 +271,20 @@ func main() {
 		}
 	}
 }
-func getConfigFilePath() string {
+func getConfigFilePath() (string, string) {
 	//get the config file path depending on the OS
 	var (
 		ConfigFilePath string
+		path           string
 	)
 	if runtime.GOOS == "windows" {
 		path := "%APPDATA%\\gofork"
 		ConfigFilePath = path + "\\gofork.conf"
 	} else {
-		path := os.Getenv("HOME") + "/.config/gofork/"
+		path = os.Getenv("HOME") + "/.config/gofork/"
 		ConfigFilePath = path + "gofork.conf"
 	}
-	return ConfigFilePath
+	return path, ConfigFilePath
 }
 
 func readConfig() string {
@@ -286,21 +292,32 @@ func readConfig() string {
 		auth Auth
 	)
 	//read the config file
-	configFilePath := getConfigFilePath()
+	_, configFilePath := getConfigFilePath()
 	dat, _ := os.ReadFile(configFilePath)
 	json.Unmarshal([]byte(dat), &auth)
 	return auth.Token
 }
 func writeConfig(token string) {
 	//write the token to the config file depending on the OS
-	configFilePath := getConfigFilePath()
-	os.Mkdir(configFilePath, 0777)
-	ioutil.WriteFile(configFilePath, []byte(token), 0644)
-	color.Success.Println("Token written to config file " + configFilePath)
+	if runtime.GOOS == "windows" {
+		path := "%APPDATA%\\gofork"
+		os.Mkdir(path, 0777)
+		ConfigFilePath := path + "\\gofork.conf"
+		ioutil.WriteFile(ConfigFilePath, []byte(token), 0644)
+		color.Success.Println("Token written to config file " + ConfigFilePath)
+	} else {
+		path, cfp := getConfigFilePath()
+		a := os.MkdirAll(path, 0777)
+		if a != nil {
+			color.Error.Println(a)
+		}
+		ioutil.WriteFile(cfp, []byte(token), 0644)
+		color.Success.Println("Token written to config file " + cfp)
 
+	}
 }
 func deleteConfig() {
-	configFilePath := getConfigFilePath()
+	_, configFilePath := getConfigFilePath()
 	os.Remove(configFilePath)
 
 }
@@ -355,7 +372,7 @@ func platformPrint(c *color.Theme, text string) {
 	// prints the text depending on the OS
 	platform := runtime.GOOS
 	if platform == "windows" {
-		color.Theme(*c).Print(text)
+		color.Theme(*c).Println(text)
 	} else {
 		color.Theme(*c).Println(text)
 	}
