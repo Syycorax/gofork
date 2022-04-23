@@ -97,7 +97,7 @@ func main() {
 	} else {
 		platformPrint(color.Success, success+" Found "+*repo)
 		RepoInfo = getRepoInfo(*repo, auth.Token)
-		if *branch == "" {
+		if *branch == "repo default branch" {
 			platformPrint(color.Notice, working+" No branch provided, using default branch")
 			*branch = RepoInfo.DefaultBranch
 		}
