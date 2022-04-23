@@ -57,7 +57,7 @@ func main() {
 	page := parser.Int("p", "page", &argparse.Options{Help: "Page to check (use -1 for all)", Default: 1, Required: false})
 	err := parser.Parse(os.Args)
 	if err != nil {
-		platformPrint(color.Error, parser.Usage(err))
+		platformPrint(color.Warn, parser.Usage(err))
 		os.Exit(1)
 	}
 	auth.Token = readConfig()
@@ -66,7 +66,6 @@ func main() {
 		platformPrint(color.Error, "Please provide a PAT (https://tinyurl.com/GITHUBPAT) (Don't allow any scope, the token is stored in PLAINTEXT)")
 		input := getInput()
 		output := "{\"PAT\": \"" + input + "\"}"
-		platformPrint(color.Success, output)
 		writeConfig(output)
 		platformPrint(color.Success, "PAT saved")
 		auth.Token = readConfig()
@@ -93,10 +92,15 @@ func main() {
 			platformPrint(color.Error, "Incorrect input provided exiting")
 			os.Exit(1)
 		}
+	} else if RepoCheck(*repo, auth.Token) == 3 {
+		platformPrint(color.Error, fail+" Unknow error")
 	} else {
 		platformPrint(color.Success, success+" Found "+*repo)
 		RepoInfo = getRepoInfo(*repo, auth.Token)
-		*branch = RepoInfo.DefaultBranch
+		if *branch == "" {
+			platformPrint(color.Notice, working+" No branch provided, using default branch")
+			*branch = RepoInfo.DefaultBranch
+		}
 		platformPrint(color.Notice, working+" Looking for "+*repo+":"+*branch)
 		if RepoInfo.ForkCount == 0 {
 			platformPrint(color.Error, fail+" No forks found")
@@ -278,8 +282,9 @@ func getConfigFilePath() (string, string) {
 		path           string
 	)
 	if runtime.GOOS == "windows" {
-		path := "%APPDATA%\\gofork"
-		ConfigFilePath = path + "\\gofork.conf"
+		path, _ = os.UserConfigDir()
+		path = path + "\\gofork"
+		ConfigFilePath = path + "\\config.json"
 	} else {
 		path = os.Getenv("HOME") + "/.config/gofork/"
 		ConfigFilePath = path + "gofork.conf"
@@ -299,17 +304,15 @@ func readConfig() string {
 }
 func writeConfig(token string) {
 	//write the token to the config file depending on the OS
+	path, cfp := getConfigFilePath()
 	if runtime.GOOS == "windows" {
-		path := "%APPDATA%\\gofork"
 		os.Mkdir(path, 0777)
-		ConfigFilePath := path + "\\gofork.conf"
-		ioutil.WriteFile(ConfigFilePath, []byte(token), 0644)
-		color.Success.Println("Token written to config file " + ConfigFilePath)
+		ioutil.WriteFile(cfp, []byte(token), 0644)
+		platformPrint(color.Success, "Token written to config file "+cfp)
 	} else {
-		path, cfp := getConfigFilePath()
 		os.MkdirAll(path, 0777)
 		ioutil.WriteFile(cfp, []byte(token), 0644)
-		color.Success.Println("Token written to config file " + cfp)
+		platformPrint(color.Success, "Token written to config file "+cfp)
 
 	}
 }
