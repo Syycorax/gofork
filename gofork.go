@@ -53,7 +53,7 @@ func main() {
 	parser := argparse.NewParser("gofork", "CLI tool to find active forks")
 	repo := parser.String("r", "repo", &argparse.Options{Required: false, Help: "Repository to check"})
 	branch := parser.String("b", "branch", &argparse.Options{Required: false, Help: "Branch to check", Default: "repo default branch"})
-	verboseflag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show private and up to date repositories"})
+	verboseflag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show private/invalid and up to date repositories"})
 	page := parser.Int("p", "page", &argparse.Options{Help: "Page to check (use -1 for all)", Default: 1, Required: false})
 	err := parser.Parse(os.Args)
 	if err != nil {
@@ -191,7 +191,7 @@ func main() {
 				aheadtable.Append(v)
 			}
 			if ahead.Len() > 0 {
-				platformPrint(color.Success, success+" Forks ahead:")
+				platformPrint(color.Success, success+" Forks ahead: "+strconv.Itoa(ahead.Len()))
 				aheadtable.Render()
 			} else {
 				platformPrint(color.Notice, mitigate+" No forks ahead of "+RepoInfo.Owner.Login+":"+*branch)
@@ -210,7 +210,7 @@ func main() {
 				divergetable.Append(v)
 			}
 			if diverge.Len() > 0 {
-				platformPrint(color.Notice, mitigate+" Forks diverged:")
+				platformPrint(color.Notice, mitigate+" Forks diverged: "+strconv.Itoa(diverge.Len()))
 				divergetable.Render()
 			} else {
 				platformPrint(color.Notice, mitigate+" No forks diverged of "+RepoInfo.Owner.Login+":"+*branch)
@@ -228,7 +228,7 @@ func main() {
 				behindtable.Append(v)
 			}
 			if behind.Len() > 0 {
-				platformPrint(color.Warn, fail+" Forks behind:")
+				platformPrint(color.Warn, fail+" Forks behind: "+strconv.Itoa(behind.Len()))
 				behindtable.Render()
 			} else {
 				platformPrint(color.Notice, mitigate+" No forks behind of "+RepoInfo.Owner.Login+":"+*branch)
@@ -246,7 +246,7 @@ func main() {
 					eventable.Append(v)
 				}
 				if even.Len() > 0 {
-					platformPrint(color.Notice, mitigate+" Forks up to date:")
+					platformPrint(color.Notice, mitigate+" Forks up to date: "+strconv.Itoa(even.Len()))
 					eventable.Render()
 				} else {
 					platformPrint(color.Notice, mitigate+" No forks identical to "+RepoInfo.Owner.Login+":"+*branch)
@@ -263,7 +263,7 @@ func main() {
 					privatetable.Append(v)
 				}
 				if private.Len() > 0 {
-					platformPrint(color.Question, mitigate+" Private forks:")
+					platformPrint(color.Question, mitigate+" Private/invalid forks: "+strconv.Itoa(private.Len()))
 					privatetable.Render()
 				} else {
 					platformPrint(color.Notice, mitigate+" No forks private of "+RepoInfo.Owner.Login+":"+*branch)
