@@ -53,7 +53,7 @@ func main() {
 	parser := argparse.NewParser("gofork", "CLI tool to find active forks")
 	repo := parser.String("r", "repo", &argparse.Options{Required: false, Help: "Repository to check"})
 	branch := parser.String("b", "branch", &argparse.Options{Required: false, Help: "Branch to check", Default: "repo default branch"})
-	verboseflag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show private/invalid and up to date repositories"})
+	verboseflag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show deleted and up to date repositories"})
 	page := parser.Int("p", "page", &argparse.Options{Help: "Page to check (use -1 for all)", Default: 1, Required: false})
 	err := parser.Parse(os.Args)
 	if err != nil {
@@ -143,22 +143,28 @@ func main() {
 			behind := list.New()
 			diverge := list.New()
 			even := list.New()
-			private := list.New()
+			invalid := list.New()
 			bar := progressbar.Default(int64(RepoInfo.ForkCount))
 			for page := *page; page < pages+1; page++ {
 				url := "https://api.github.com/repos/" + *repo + "/forks?per_page=" + strconv.Itoa(RepoInfo.ForkCount)
 				url = url + "&page=" + strconv.Itoa(page)
-				req, _ := http.NewRequest("GET", url, nil)
+				req, err := http.NewRequest("GET", url, nil)
+				errorHandler(err)
 				req.Header.Add("Authorization", "token "+string(auth.Token))
-				resp, _ := http.DefaultClient.Do(req)
-				body, _ := ioutil.ReadAll(resp.Body)
+				resp, err := http.DefaultClient.Do(req)
+				errorHandler(err)
+				body, err := ioutil.ReadAll(resp.Body)
+				errorHandler(err)
 				json.Unmarshal(body, &forks)
 				for _, fork := range forks {
 					url = "https://api.github.com/repos/" + fork.FullName + "/compare/" + RepoInfo.Owner.Login + ":" + *branch + "..." + *branch
-					req, _ = http.NewRequest("GET", url, nil)
+					req, err = http.NewRequest("GET", url, nil)
+					errorHandler(err)
 					req.Header.Add("Authorization", "token "+string(auth.Token))
-					resp, _ = http.DefaultClient.Do(req)
-					body, _ = ioutil.ReadAll(resp.Body)
+					resp, err = http.DefaultClient.Do(req)
+					errorHandler(err)
+					body, err = ioutil.ReadAll(resp.Body)
+					errorHandler(err)
 					json.Unmarshal(body, &fork)
 					if fork.Status == "ahead" {
 						ahead.PushBack(fork)
@@ -169,7 +175,7 @@ func main() {
 					} else if fork.Status == "diverged" {
 						diverge.PushBack(fork)
 					} else {
-						private.PushBack(fork)
+						invalid.PushBack(fork)
 					}
 					bar.Add(1)
 				}
@@ -239,7 +245,7 @@ func main() {
 				eventmap := [][]string{}
 				for e := even.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
-					url := "https://github.com" + string(fork.FullName)
+					url := "https://github.com/" + string(fork.FullName)
 					eventmap = append(eventmap, []string{fork.FullName, url})
 				}
 				for _, v := range eventmap {
@@ -251,22 +257,22 @@ func main() {
 				} else {
 					platformPrint(color.Notice, mitigate+" No forks identical to "+RepoInfo.Owner.Login+":"+*branch)
 				}
-				privatetable := tablewriter.NewWriter(os.Stdout)
-				privatetable.SetHeader([]string{"Fork", "URL"})
-				privatemap := [][]string{}
-				for e := private.Front(); e != nil; e = e.Next() {
+				invalidtable := tablewriter.NewWriter(os.Stdout)
+				invalidtable.SetHeader([]string{"Fork", "URL"})
+				invalidmap := [][]string{}
+				for e := invalid.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
-					url := "https://github.com" + string(fork.FullName)
-					privatemap = append(privatemap, []string{fork.FullName, url})
+					url := "https://github.com/" + string(fork.FullName)
+					invalidmap = append(invalidmap, []string{fork.FullName, url})
 				}
-				for _, v := range privatemap {
-					privatetable.Append(v)
+				for _, v := range invalidmap {
+					invalidtable.Append(v)
 				}
-				if private.Len() > 0 {
-					platformPrint(color.Question, mitigate+" Private/invalid forks: "+strconv.Itoa(private.Len()))
-					privatetable.Render()
+				if invalid.Len() > 0 {
+					platformPrint(color.Question, mitigate+" invalid/deleted forks: "+strconv.Itoa(invalid.Len()))
+					invalidtable.Render()
 				} else {
-					platformPrint(color.Notice, mitigate+" No forks private of "+RepoInfo.Owner.Login+":"+*branch)
+					platformPrint(color.Notice, mitigate+" No forks invalid/deleted of "+RepoInfo.Owner.Login+":"+*branch)
 				}
 			}
 			if ahead.Len() == 0 && behind.Len() == 0 && even.Len() == 0 && diverge.Len() == 0 && *branch == "master" {
@@ -280,9 +286,11 @@ func getConfigFilePath() (string, string) {
 	var (
 		ConfigFilePath string
 		path           string
+		err            error
 	)
 	if runtime.GOOS == "windows" {
-		path, _ = os.UserConfigDir()
+		path, err = os.UserConfigDir()
+		errorHandler(err)
 		path = path + "\\gofork"
 		ConfigFilePath = path + "\\config.json"
 	} else {
@@ -295,10 +303,12 @@ func getConfigFilePath() (string, string) {
 func readConfig() string {
 	var (
 		auth Auth
+		err  error
 	)
 	//read the config file
 	_, configFilePath := getConfigFilePath()
-	dat, _ := os.ReadFile(configFilePath)
+	dat, err := os.ReadFile(configFilePath)
+	errorHandler(err)
 	json.Unmarshal([]byte(dat), &auth)
 	return auth.Token
 }
@@ -333,18 +343,27 @@ func parseInput(data string) string {
 
 }
 func getInput() string {
+	var (
+		err error
+	)
 	// get token from input and parses it with ParseInput()
 	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
+	input, err := reader.ReadString('\n')
+	errorHandler(err)
 	input = parseInput(input)
 	return input
 }
 func RepoCheck(repo string, token string) int {
+	var (
+		err error
+	)
 	// checks if the repo is a valid github repo
 	url := "https://api.github.com/repos/" + repo
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	errorHandler((err))
 	req.Header.Add("Authorization", "token "+token)
-	res, _ := http.DefaultClient.Do(req)
+	res, err := http.DefaultClient.Do(req)
+	errorHandler((err))
 	if res.StatusCode == 200 {
 		return 0
 	} else if res.StatusCode == 404 {
@@ -359,12 +378,16 @@ func getRepoInfo(repo string, token string) RepoInfo {
 	// gets the repo info from github
 	var (
 		repoInfo RepoInfo
+		err      error
 	)
 	url := "https://api.github.com/repos/" + repo
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	errorHandler(err)
 	req.Header.Add("Authorization", "token "+token)
-	res, _ := http.DefaultClient.Do(req)
-	body, _ := ioutil.ReadAll(res.Body)
+	res, err := http.DefaultClient.Do(req)
+	errorHandler(err)
+	body, err := ioutil.ReadAll(res.Body)
+	errorHandler(err)
 	json.Unmarshal(body, &repoInfo)
 	return repoInfo
 }
@@ -396,4 +419,12 @@ func sortTable(table *list.List, order string) list.List {
 		}
 	}
 	return *table
+}
+func errorHandler(err error) {
+	fail := "[X]"
+	if err != nil {
+		platformPrint(color.Error, fail+" an error occured "+err.Error())
+		os.Exit(1)
+	}
+
 }
