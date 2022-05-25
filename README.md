@@ -18,7 +18,7 @@ Arguments:
   -h  --help     Print help information
   -r  --repo     Repository to check
   -b  --branch   Branch to check. Default: repo default branch
-  -v  --verbose  Show private and up to date repositories
+  -v  --verbose  Show deleted and up to date repositories
   -p  --page     Page to check (use -1 for all). Default: 1
 ```
 
