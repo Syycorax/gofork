@@ -41,45 +41,43 @@ type Auth struct {
 
 func main() {
 	var (
-		RepoInfo RepoInfo
-		forks    []Fork
-		auth     Auth
+		forks []Fork
+		auth  Auth
 	)
-	fail := "[X]"
-	success := "[✓]"
-	warning := "[!]"
-	working := "[+]"
-	mitigate := "[~]"
+	fail := "[X] "
+	success := "[✓] "
+	warning := "[!] "
+	working := "[+] "
+	mitigate := "[~] "
 	parser := argparse.NewParser("gofork", "CLI tool to find active forks")
-	repo := parser.String("r", "repo", &argparse.Options{Required: false, Help: "Repository to check"})
+	repo := parser.String("r", "repo", &argparse.Options{Required: true, Help: "Repository to check"})
 	branch := parser.String("b", "branch", &argparse.Options{Required: false, Help: "Branch to check", Default: "repo default branch"})
-	verboseflag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show private/invalid and up to date repositories"})
+	verboseFlag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show deleted and up to date repositories"})
 	page := parser.Int("p", "page", &argparse.Options{Help: "Page to check (use -1 for all)", Default: 1, Required: false})
 	err := parser.Parse(os.Args)
 	if err != nil {
 		platformPrint(color.Warn, parser.Usage(err))
 		os.Exit(1)
 	}
+
 	auth.Token = readConfig()
+	platformPrint(color.Error, auth.Token)
 	if auth.Token == "" {
 		// TODO: don't store token in plaintext
 		platformPrint(color.Error, "Please provide a PAT (https://tinyurl.com/GITHUBPAT) (Don't allow any scope, the token is stored in PLAINTEXT)")
 		input := getInput()
 		output := "{\"PAT\": \"" + input + "\"}"
 		writeConfig(output)
-		platformPrint(color.Success, "PAT saved")
+		platformPrint(color.Success, "PAT saved to ")
 		auth.Token = readConfig()
 	}
-	if *repo == "" {
-		platformPrint(color.Error, "Please provide a repository")
-		os.Exit(1)
-	}
-	platformPrint(color.Notice, working+" Looking for "+*repo)
+
+	platformPrint(color.Notice, working+"Looking for "+*repo)
 	if RepoCheck(*repo, auth.Token) == 1 {
-		platformPrint(color.Error, fail+" Repository not found")
+		platformPrint(color.Error, fail+"Repository not found")
 		os.Exit(1)
 	} else if RepoCheck(*repo, auth.Token) == 2 {
-		platformPrint(color.Error, fail+" Incorrect PAT, do you want to delete config file? (y/n)")
+		platformPrint(color.Error, fail+"Incorrect PAT, do you want to delete config file? (y/n)")
 		input := getInput()
 		if input == "y" || input == "Y" {
 			deleteConfig()
@@ -93,19 +91,20 @@ func main() {
 			os.Exit(1)
 		}
 	} else if RepoCheck(*repo, auth.Token) == 3 {
-		platformPrint(color.Error, fail+" Unknow error")
+		platformPrint(color.Error, fail+"Unknow error")
+
 	} else {
-		platformPrint(color.Success, success+" Found "+*repo)
-		RepoInfo = getRepoInfo(*repo, auth.Token)
+		platformPrint(color.Success, success+"Found "+*repo)
+		RepoInfo := getRepoInfo(*repo, auth.Token)
 		if *branch == "repo default branch" {
-			platformPrint(color.Notice, working+" No branch provided, using default branch")
+			platformPrint(color.Notice, working+"No branch provided, using default branch")
 			*branch = RepoInfo.DefaultBranch
 		}
-		platformPrint(color.Notice, working+" Looking for "+*repo+":"+*branch)
+		platformPrint(color.Notice, working+"Looking for "+*repo+":"+*branch)
 		if RepoInfo.ForkCount == 0 {
-			platformPrint(color.Error, fail+" No forks found")
+			platformPrint(color.Error, fail+"No forks found")
 		} else {
-			platformPrint(color.Success, success+" "+strconv.Itoa(RepoInfo.ForkCount)+" Forks found")
+			platformPrint(color.Success, success+strconv.Itoa(RepoInfo.ForkCount)+" Forks found")
 			pagesDecimal := float64(RepoInfo.ForkCount) / float64(100)
 			// The total number of pages
 			pages := RepoInfo.ForkCount / 100
@@ -113,37 +112,33 @@ func main() {
 				pages = int(pages) + 1
 			}
 			if *page > pages {
-				platformPrint(color.Warn, warning+" The page is out of range (max. "+strconv.Itoa(pages)+"), showing page 1")
+				platformPrint(color.Warn, warning+"The page is out of range (max. "+strconv.Itoa(pages)+"), showing page 1")
 				*page = 1
 			}
 			if RepoInfo.ForkCount > 100 && *page == 1 {
 				RepoInfo.ForkCount = 100
 				// Force the loop to iterate over the selected page only
 				pages = *page
-				platformPrint(color.Info, mitigate+" More than 100 forks found, only showing first 100 (use -p to get other results)")
+				platformPrint(color.Info, mitigate+"More than 100 forks found, only showing first 100 (use -p to get other results)")
 			}
 			if RepoInfo.ForkCount > 100 && *page > 1 {
 				RepoInfo.ForkCount = 100
 				// Force the loop to iterate over the selected page only
 				pages = *page
-				platformPrint(color.Info, mitigate+" More than 100 forks found, showing page "+strconv.Itoa(*page))
+				platformPrint(color.Info, mitigate+"More than 100 forks found, showing page "+strconv.Itoa(*page))
 			}
 			if RepoInfo.ForkCount > 100 && *page == -1 {
-				platformPrint(color.Info, mitigate+" More than 100 forks found, showing page all pages because -p is used with -1")
+				platformPrint(color.Info, mitigate+"More than 100 forks found, showing page all pages because -p is used with -1")
 			}
 			if *page < 1 {
 				if *page != -1 {
-					platformPrint(color.Warn, warning+" The number of page is lower than 1, showing page 1")
+					platformPrint(color.Warn, warning+"The number of page is lower than 1, showing page 1")
 					pages = 1
 					RepoInfo.ForkCount = 100
 				}
 				*page = 1
 			}
-			ahead := list.New()
-			behind := list.New()
-			diverge := list.New()
-			even := list.New()
-			private := list.New()
+			ahead, behind, diverge, even, deleted := list.New(), list.New(), list.New(), list.New(), list.New()
 			bar := progressbar.Default(int64(RepoInfo.ForkCount))
 			for page := *page; page < pages+1; page++ {
 				url := "https://api.github.com/repos/" + *repo + "/forks?per_page=" + strconv.Itoa(RepoInfo.ForkCount)
@@ -169,7 +164,7 @@ func main() {
 					} else if fork.Status == "diverged" {
 						diverge.PushBack(fork)
 					} else {
-						private.PushBack(fork)
+						deleted.PushBack(fork)
 					}
 					bar.Add(1)
 				}
@@ -177,119 +172,118 @@ func main() {
 			sortTable(ahead, "desc")
 			sortTable(behind, "asc")
 			sortTable(diverge, "desc")
-			aheadtable := tablewriter.NewWriter(os.Stdout)
-			aheadtable.SetHeader([]string{"Fork", "Ahead by", "URL"})
-			aheadmap := [][]string{}
+			aheadTable := tablewriter.NewWriter(os.Stdout)
+			aheadTable.SetHeader([]string{"Fork", "Ahead by", "URL"})
+			aheadMap := [][]string{}
 			for e := ahead.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				aheadBy := strconv.Itoa(fork.AheadBy)
 				url := "https://github.com/" + string(fork.FullName)
-				aheadmap = append(aheadmap, []string{fork.FullName, aheadBy, url})
+				aheadMap = append(aheadMap, []string{fork.FullName, aheadBy, url})
 
 			}
-			for _, v := range aheadmap {
-				aheadtable.Append(v)
+			for _, v := range aheadMap {
+				aheadTable.Append(v)
 			}
 			if ahead.Len() > 0 {
-				platformPrint(color.Success, success+" Forks ahead: "+strconv.Itoa(ahead.Len()))
-				aheadtable.Render()
+				platformPrint(color.Success, success+"Forks ahead: "+strconv.Itoa(ahead.Len()))
+				aheadTable.Render()
 			} else {
 				platformPrint(color.Notice, mitigate+" No forks ahead of "+RepoInfo.Owner.Login+":"+*branch)
 			}
-			divergetable := tablewriter.NewWriter(os.Stdout)
-			divergetable.SetHeader([]string{"Fork", "Ahead by", "Behind by", "URL"})
-			divergemap := [][]string{}
+			divergeTable := tablewriter.NewWriter(os.Stdout)
+			divergeTable.SetHeader([]string{"Fork", "Ahead by", "Behind by", "URL"})
+			divergeMap := [][]string{}
 			for e := diverge.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				aheadBy := strconv.Itoa(fork.AheadBy)
 				behindBy := strconv.Itoa(fork.BehindBy)
 				url := "https://github.com/" + string(fork.FullName)
-				divergemap = append(divergemap, []string{fork.FullName, aheadBy, behindBy, url})
+				divergeMap = append(divergeMap, []string{fork.FullName, aheadBy, behindBy, url})
 			}
-			for _, v := range divergemap {
-				divergetable.Append(v)
+			for _, v := range divergeMap {
+				divergeTable.Append(v)
 			}
 			if diverge.Len() > 0 {
-				platformPrint(color.Notice, mitigate+" Forks diverged: "+strconv.Itoa(diverge.Len()))
-				divergetable.Render()
+				platformPrint(color.Notice, mitigate+"Forks diverged: "+strconv.Itoa(diverge.Len()))
+				divergeTable.Render()
 			} else {
-				platformPrint(color.Notice, mitigate+" No forks diverged of "+RepoInfo.Owner.Login+":"+*branch)
+				platformPrint(color.Notice, mitigate+"No forks diverged of "+RepoInfo.Owner.Login+":"+*branch)
 			}
-			behindtable := tablewriter.NewWriter(os.Stdout)
-			behindtable.SetHeader([]string{"Fork", "Behind by", "URL"})
-			behindmap := [][]string{}
+			behindTable := tablewriter.NewWriter(os.Stdout)
+			behindTable.SetHeader([]string{"Fork", "Behind by", "URL"})
+			behindMap := [][]string{}
 			for e := behind.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				behindBy := strconv.Itoa(fork.BehindBy)
 				url := "https://github.com/" + string(fork.FullName)
-				behindmap = append(behindmap, []string{fork.FullName, behindBy, url})
+				behindMap = append(behindMap, []string{fork.FullName, behindBy, url})
 			}
-			for _, v := range behindmap {
-				behindtable.Append(v)
+			for _, v := range behindMap {
+				behindTable.Append(v)
 			}
 			if behind.Len() > 0 {
-				platformPrint(color.Warn, fail+" Forks behind: "+strconv.Itoa(behind.Len()))
-				behindtable.Render()
+				platformPrint(color.Warn, fail+"Forks behind: "+strconv.Itoa(behind.Len()))
+				behindTable.Render()
 			} else {
-				platformPrint(color.Notice, mitigate+" No forks behind of "+RepoInfo.Owner.Login+":"+*branch)
+				platformPrint(color.Notice, mitigate+"No forks behind of "+RepoInfo.Owner.Login+":"+*branch)
 			}
-			if *verboseflag {
-				eventable := tablewriter.NewWriter(os.Stdout)
-				eventable.SetHeader([]string{"Fork", "URL"})
-				eventmap := [][]string{}
+			if *verboseFlag {
+				evenTable := tablewriter.NewWriter(os.Stdout)
+				evenTable.SetHeader([]string{"Fork", "URL"})
+				evenMap := [][]string{}
 				for e := even.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
 					url := "https://github.com" + string(fork.FullName)
-					eventmap = append(eventmap, []string{fork.FullName, url})
+					evenMap = append(evenMap, []string{fork.FullName, url})
 				}
-				for _, v := range eventmap {
-					eventable.Append(v)
+				for _, v := range evenMap {
+					evenTable.Append(v)
 				}
 				if even.Len() > 0 {
-					platformPrint(color.Notice, mitigate+" Forks up to date: "+strconv.Itoa(even.Len()))
-					eventable.Render()
+					platformPrint(color.Notice, mitigate+"Forks up to date: "+strconv.Itoa(even.Len()))
+					evenTable.Render()
 				} else {
-					platformPrint(color.Notice, mitigate+" No forks identical to "+RepoInfo.Owner.Login+":"+*branch)
+					platformPrint(color.Notice, mitigate+"No forks identical to "+RepoInfo.Owner.Login+":"+*branch)
 				}
-				privatetable := tablewriter.NewWriter(os.Stdout)
-				privatetable.SetHeader([]string{"Fork", "URL"})
-				privatemap := [][]string{}
-				for e := private.Front(); e != nil; e = e.Next() {
+				invalidTable := tablewriter.NewWriter(os.Stdout)
+				invalidTable.SetHeader([]string{"Fork", "URL"})
+				invalidMap := [][]string{}
+				for e := deleted.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
 					url := "https://github.com" + string(fork.FullName)
-					privatemap = append(privatemap, []string{fork.FullName, url})
+					invalidMap = append(invalidMap, []string{fork.FullName, url})
 				}
-				for _, v := range privatemap {
-					privatetable.Append(v)
+				for _, v := range invalidMap {
+					invalidTable.Append(v)
 				}
-				if private.Len() > 0 {
-					platformPrint(color.Question, mitigate+" Private/invalid forks: "+strconv.Itoa(private.Len()))
-					privatetable.Render()
+				if deleted.Len() > 0 {
+					platformPrint(color.Question, mitigate+"deleted forks: "+strconv.Itoa(deleted.Len()))
+					invalidTable.Render()
 				} else {
-					platformPrint(color.Notice, mitigate+" No forks private of "+RepoInfo.Owner.Login+":"+*branch)
+					platformPrint(color.Notice, mitigate+"No deleted forks of "+RepoInfo.Owner.Login+":"+*branch)
 				}
 			}
 			if ahead.Len() == 0 && behind.Len() == 0 && even.Len() == 0 && diverge.Len() == 0 && *branch == "master" {
-				platformPrint(color.Error, fail+" No forks found on branch master maybe try with main?")
+				platformPrint(color.Error, fail+"No forks found on branch master maybe try with main?")
 			}
 		}
 	}
 }
-func getConfigFilePath() (string, string) {
+func getConfigFilePath() string {
 	//get the config file path depending on the OS
 	var (
 		ConfigFilePath string
 		path           string
 	)
 	if runtime.GOOS == "windows" {
-		path, _ = os.UserConfigDir()
-		path = path + "\\gofork"
-		ConfigFilePath = path + "\\config.json"
+		ConfigFilePath, _ = os.UserConfigDir()
+		ConfigFilePath += "\\gofork\\config.json"
 	} else {
 		path = os.Getenv("HOME") + "/.config/gofork/"
 		ConfigFilePath = path + "gofork.conf"
 	}
-	return path, ConfigFilePath
+	return ConfigFilePath
 }
 
 func readConfig() string {
@@ -297,30 +291,35 @@ func readConfig() string {
 		auth Auth
 	)
 	//read the config file
-	_, configFilePath := getConfigFilePath()
+	configFilePath := getConfigFilePath()
 	dat, _ := os.ReadFile(configFilePath)
 	json.Unmarshal([]byte(dat), &auth)
 	return auth.Token
 }
+
 func writeConfig(token string) {
 	//write the token to the config file depending on the OS
-	path, cfp := getConfigFilePath()
-	if runtime.GOOS == "windows" {
-		os.Mkdir(path, 0777)
-		ioutil.WriteFile(cfp, []byte(token), 0644)
-		platformPrint(color.Success, "Token written to config file "+cfp)
-	} else {
-		os.MkdirAll(path, 0777)
-		ioutil.WriteFile(cfp, []byte(token), 0644)
-		platformPrint(color.Success, "Token written to config file "+cfp)
+	cfp := getConfigFilePath()
+	os.MkdirAll(cfp[:len(cfp)-11], 0777)
+	ioutil.WriteFile(cfp, []byte(token), 0644)
+	platformPrint(color.Success, "Token written to config file "+cfp)
 
-	}
 }
+
 func deleteConfig() {
-	_, configFilePath := getConfigFilePath()
+	configFilePath := getConfigFilePath()
 	os.Remove(configFilePath)
 
 }
+
+func getInput() string {
+	// get token from input and parses it with ParseInput()
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = parseInput(input)
+	return input
+}
+
 func parseInput(data string) string {
 	// parses the user input depending on the OS
 	platform := runtime.GOOS
@@ -332,15 +331,9 @@ func parseInput(data string) string {
 	return data
 
 }
-func getInput() string {
-	// get token from input and parses it with ParseInput()
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = parseInput(input)
-	return input
-}
+
 func RepoCheck(repo string, token string) int {
-	// checks if the repo is a valid github repo
+	// checks if the repo is a valid github repo returns 0 if valid, 1 if not and 2 if there is an auth error. Any other error is returned as 3
 	url := "https://api.github.com/repos/" + repo
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", "token "+token)
@@ -355,6 +348,7 @@ func RepoCheck(repo string, token string) int {
 		return 3
 	}
 }
+
 func getRepoInfo(repo string, token string) RepoInfo {
 	// gets the repo info from github
 	var (
