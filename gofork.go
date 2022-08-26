@@ -13,7 +13,7 @@ import (
 
 	"github.com/akamensky/argparse"
 	"github.com/gookit/color"
-	"github.com/olekukonko/tablewriter"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/schollz/progressbar/v3"
 )
 
@@ -102,6 +102,7 @@ func main() {
 		platformPrint(color.Notice, working+"Looking for "+*repo+":"+*branch)
 		if RepoInfo.ForkCount == 0 {
 			platformPrint(color.Error, fail+"No forks found")
+
 		} else {
 			platformPrint(color.Success, success+strconv.Itoa(RepoInfo.ForkCount)+" Forks found")
 			pagesDecimal := float64(RepoInfo.ForkCount) / float64(100)
@@ -137,6 +138,7 @@ func main() {
 				}
 				*page = 1
 			}
+
 			ahead, behind, diverge, even, deleted := list.New(), list.New(), list.New(), list.New(), list.New()
 			bar := progressbar.Default(int64(RepoInfo.ForkCount))
 			for page := *page; page < pages+1; page++ {
@@ -168,107 +170,102 @@ func main() {
 					bar.Add(1)
 				}
 			}
+			bar.Finish()
+
 			sortTable(ahead, "desc")
 			sortTable(behind, "asc")
 			sortTable(diverge, "desc")
-			aheadTable := tablewriter.NewWriter(os.Stdout)
-			aheadTable.SetHeader([]string{"Fork", "Ahead by", "URL"})
-			aheadMap := [][]string{}
+			aheadTable := table.NewWriter()
+			aheadTable.SetOutputMirror(os.Stdout)
+			aheadTable.AppendHeader(table.Row{"Fork", "Ahead by", "URL"})
 			for e := ahead.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				aheadBy := strconv.Itoa(fork.AheadBy)
 				url := "https://github.com/" + string(fork.FullName)
-				aheadMap = append(aheadMap, []string{fork.FullName, aheadBy, url})
-
-			}
-			for _, v := range aheadMap {
-				aheadTable.Append(v)
+				aheadTable.AppendRow([]interface{}{fork.FullName, aheadBy, url})
 			}
 			if ahead.Len() > 0 {
 				platformPrint(color.Success, success+"Forks ahead: "+strconv.Itoa(ahead.Len()))
+				aheadTable.SetStyle(table.StyleRounded)
 				aheadTable.Render()
 			} else {
 				platformPrint(color.Notice, mitigate+" No forks ahead of "+RepoInfo.Owner.Login+":"+*branch)
 			}
-			divergeTable := tablewriter.NewWriter(os.Stdout)
-			divergeTable.SetHeader([]string{"Fork", "Ahead by", "Behind by", "URL"})
-			divergeMap := [][]string{}
+
+			divergeTable := table.NewWriter()
+			divergeTable.SetOutputMirror(os.Stdout)
+			divergeTable.AppendHeader(table.Row{"Fork", "Ahead by", "Behind by", "URL"})
 			for e := diverge.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				aheadBy := strconv.Itoa(fork.AheadBy)
 				behindBy := strconv.Itoa(fork.BehindBy)
 				url := "https://github.com/" + string(fork.FullName)
-				divergeMap = append(divergeMap, []string{fork.FullName, aheadBy, behindBy, url})
-			}
-			for _, v := range divergeMap {
-				divergeTable.Append(v)
+				divergeTable.AppendRow([]interface{}{fork.FullName, aheadBy, behindBy, url})
 			}
 			if diverge.Len() > 0 {
 				platformPrint(color.Notice, mitigate+"Forks diverged: "+strconv.Itoa(diverge.Len()))
+				divergeTable.SetStyle(table.StyleRounded)
 				divergeTable.Render()
 			} else {
 				platformPrint(color.Notice, mitigate+"No forks diverged of "+RepoInfo.Owner.Login+":"+*branch)
 			}
-			behindTable := tablewriter.NewWriter(os.Stdout)
-			behindTable.SetHeader([]string{"Fork", "Behind by", "URL"})
-			behindMap := [][]string{}
+
+			behindTable := table.NewWriter()
+			behindTable.SetOutputMirror(os.Stdout)
+			behindTable.AppendHeader(table.Row{"Fork", "Behind by", "URL"})
 			for e := behind.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				behindBy := strconv.Itoa(fork.BehindBy)
 				url := "https://github.com/" + string(fork.FullName)
-				behindMap = append(behindMap, []string{fork.FullName, behindBy, url})
-			}
-			for _, v := range behindMap {
-				behindTable.Append(v)
+				behindTable.AppendRow([]interface{}{fork.FullName, behindBy, url})
 			}
 			if behind.Len() > 0 {
 				platformPrint(color.Warn, fail+"Forks behind: "+strconv.Itoa(behind.Len()))
+				behindTable.SetStyle(table.StyleRounded)
 				behindTable.Render()
 			} else {
 				platformPrint(color.Notice, mitigate+"No forks behind of "+RepoInfo.Owner.Login+":"+*branch)
 			}
+
 			if *verboseFlag {
-				evenTable := tablewriter.NewWriter(os.Stdout)
-				evenTable.SetHeader([]string{"Fork", "URL"})
-				evenMap := [][]string{}
+				evenTable := table.NewWriter()
+				evenTable.AppendHeader(table.Row{"Fork", "URL"})
 				for e := even.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
 					url := "https://github.com" + string(fork.FullName)
-					evenMap = append(evenMap, []string{fork.FullName, url})
-				}
-				for _, v := range evenMap {
-					evenTable.Append(v)
+					evenTable.AppendRow([]interface{}{fork.FullName, url})
 				}
 				if even.Len() > 0 {
 					platformPrint(color.Notice, mitigate+"Forks up to date: "+strconv.Itoa(even.Len()))
+					evenTable.SetStyle(table.StyleRounded)
 					evenTable.Render()
 				} else {
 					platformPrint(color.Notice, mitigate+"No forks identical to "+RepoInfo.Owner.Login+":"+*branch)
 				}
-				deletedTable := tablewriter.NewWriter(os.Stdout)
-				deletedTable.SetHeader([]string{"Fork", "URL"})
-				deletedMap := [][]string{}
+
+				deletedTable := table.NewWriter()
+				deletedTable.AppendHeader(table.Row{"Fork", "URL"})
 				for e := deleted.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
 					url := "https://github.com" + string(fork.FullName)
-					deletedMap = append(deletedMap, []string{fork.FullName, url})
-				}
-				for _, v := range deletedMap {
-					deletedTable.Append(v)
+					deletedTable.AppendRow([]interface{}{fork.FullName, url})
 				}
 				if deleted.Len() > 0 {
 					platformPrint(color.Question, mitigate+"deleted forks: "+strconv.Itoa(deleted.Len()))
+					deletedTable.SetStyle(table.StyleRounded)
 					deletedTable.Render()
 				} else {
 					platformPrint(color.Notice, mitigate+"No deleted forks of "+RepoInfo.Owner.Login+":"+*branch)
 				}
 			}
+
 			if ahead.Len() == 0 && behind.Len() == 0 && even.Len() == 0 && diverge.Len() == 0 && *branch == "master" {
 				platformPrint(color.Error, fail+"No forks found on branch master maybe try with main?")
 			}
 		}
 	}
 }
+
 func getConfigFilePath() string {
 	//get the config file path depending on the OS
 	var (
@@ -361,6 +358,7 @@ func getRepoInfo(repo string, token string) RepoInfo {
 	json.Unmarshal(body, &repoInfo)
 	return repoInfo
 }
+
 func platformPrint(c *color.Theme, text string) {
 	// prints the text depending on the OS
 	platform := runtime.GOOS
@@ -370,6 +368,7 @@ func platformPrint(c *color.Theme, text string) {
 		color.Theme(*c).Println(text)
 	}
 }
+
 func sortTable(table *list.List, order string) list.List {
 	if order == "desc" {
 		for e := table.Front(); e != nil; e = e.Next() {
