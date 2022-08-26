@@ -28,11 +28,13 @@ type Owner struct {
 }
 
 type Fork struct {
-	FullName string `json:"full_name"`
-	Url      string `json:"html_url"`
-	Status   string `json:"status"`
-	AheadBy  int    `json:"ahead_by"`
-	BehindBy int    `json:"behind_by"`
+	FullName    string `json:"full_name"`
+	Url         string `json:"html_url"`
+	Status      string `json:"status"`
+	AheadBy     int    `json:"ahead_by"`
+	BehindBy    int    `json:"behind_by"`
+	Stars       int    `json:"stargazers_count"`
+	LastUpdated string `json:"pushed_at"`
 }
 
 type Auth struct {
@@ -54,6 +56,7 @@ func main() {
 	branch := parser.String("b", "branch", &argparse.Options{Required: false, Help: "Branch to check", Default: "repo default branch"})
 	verboseFlag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show deleted and up to date repositories"})
 	pageInt := parser.Int("p", "page", &argparse.Options{Help: "Page to check (use -1 for all)", Default: 1, Required: false})
+	sortBy := parser.String("s", "sort", &argparse.Options{Help: "Sort by (stars, ahead, lastUpdated)", Default: "ahead", Required: false})
 	err := parser.Parse(os.Args)
 	if err != nil {
 		platformPrint(color.Warn, parser.Usage(err))
@@ -139,6 +142,11 @@ func main() {
 				*pageInt = 1
 			}
 
+			if *sortBy != "stars" && *sortBy != "ahead" && *sortBy != "lastUpdated" {
+				platformPrint(color.Warn, warning+"The sort option is not valid, sortingHelper by ahead")
+				*sortBy = "ahead"
+			}
+
 			ahead, behind, diverge, even, deleted := list.New(), list.New(), list.New(), list.New(), list.New()
 			bar := progressbar.Default(int64(RepoInfo.ForkCount))
 			for page := *pageInt; page < pages+1; page++ {
@@ -171,19 +179,19 @@ func main() {
 				}
 			}
 			bar.Finish()
-
-			sortTable(ahead, "desc")
-			sortTable(behind, "asc")
-			sortTable(diverge, "desc")
+			platformPrint(color.Success, success+"sorting by "+*sortBy)
 			aheadTable := table.NewWriter()
 			aheadTable.SetOutputMirror(os.Stdout)
-			aheadTable.AppendHeader(table.Row{"Fork", "Ahead by", "URL"})
+			aheadTable.AppendHeader(table.Row{"Fork", "Ahead by", "URL", "Stars", "Last updated"})
 			for e := ahead.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				aheadBy := strconv.Itoa(fork.AheadBy)
 				url := "https://github.com/" + string(fork.FullName)
-				aheadTable.AppendRow([]interface{}{fork.FullName, aheadBy, url})
+				stars := strconv.Itoa(fork.Stars) + " \033[33m\u2605" + "\033[0m"
+				LastUpdated := dateHandler(fork.LastUpdated)
+				aheadTable.AppendRow([]interface{}{fork.FullName, aheadBy, url, stars, LastUpdated})
 			}
+			sortingHelper(aheadTable, sortBy)
 			if ahead.Len() > 0 {
 				platformPrint(color.Success, success+"Forks ahead: "+strconv.Itoa(ahead.Len()))
 				aheadTable.SetStyle(table.StyleRounded)
@@ -191,17 +199,19 @@ func main() {
 			} else {
 				platformPrint(color.Notice, fail+" No forks ahead of "+RepoInfo.Owner.Login+":"+*branch)
 			}
-
 			divergeTable := table.NewWriter()
 			divergeTable.SetOutputMirror(os.Stdout)
-			divergeTable.AppendHeader(table.Row{"Fork", "Ahead by", "Behind by", "URL"})
+			divergeTable.AppendHeader(table.Row{"Fork", "Ahead by", "Behind by", "URL", "Stars", "Last Updated"})
 			for e := diverge.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				aheadBy := strconv.Itoa(fork.AheadBy)
 				behindBy := strconv.Itoa(fork.BehindBy)
 				url := "https://github.com/" + string(fork.FullName)
-				divergeTable.AppendRow([]interface{}{fork.FullName, aheadBy, behindBy, url})
+				stars := strconv.Itoa(fork.Stars) + " \033[33m\u2605" + "\033[0m"
+				lastCommit := dateHandler(fork.LastUpdated)
+				divergeTable.AppendRow([]interface{}{fork.FullName, aheadBy, behindBy, url, stars, lastCommit})
 			}
+			sortingHelper(divergeTable, sortBy)
 			if diverge.Len() > 0 {
 				platformPrint(color.Notice, mitigate+"Forks diverged: "+strconv.Itoa(diverge.Len()))
 				divergeTable.SetStyle(table.StyleRounded)
@@ -212,12 +222,21 @@ func main() {
 
 			behindTable := table.NewWriter()
 			behindTable.SetOutputMirror(os.Stdout)
-			behindTable.AppendHeader(table.Row{"Fork", "Behind by", "URL"})
+			behindTable.AppendHeader(table.Row{"Fork", "Behind by", "URL", "Stars", "Last updated"})
 			for e := behind.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				behindBy := strconv.Itoa(fork.BehindBy)
 				url := "https://github.com/" + string(fork.FullName)
-				behindTable.AppendRow([]interface{}{fork.FullName, behindBy, url})
+				stars := strconv.Itoa(fork.Stars) + " \033[33m\u2605" + "\033[0m"
+				LastUpdated := dateHandler(fork.LastUpdated)
+				behindTable.AppendRow([]interface{}{fork.FullName, behindBy, url, stars, LastUpdated})
+			}
+			if *sortBy == "ahead" { // if sorting by ahead, the behind table needs to be sorted by behind by
+				*sortBy = "behind"
+				sortingHelper(behindTable, sortBy)
+				*sortBy = "ahead"
+			} else {
+				sortingHelper(behindTable, sortBy)
 			}
 			if behind.Len() > 0 {
 				platformPrint(color.Warn, fail+"Forks behind: "+strconv.Itoa(behind.Len()))
@@ -229,11 +248,20 @@ func main() {
 
 			if *verboseFlag {
 				evenTable := table.NewWriter()
-				evenTable.AppendHeader(table.Row{"Fork", "URL"})
+				evenTable.AppendHeader(table.Row{"Fork", "URL", "Stars"})
 				for e := even.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
 					url := "https://github.com" + string(fork.FullName)
-					evenTable.AppendRow([]interface{}{fork.FullName, url})
+					stars := strconv.Itoa(fork.Stars) + " \033[33m\u2605" + "\033[0m"
+					fork.LastUpdated = dateHandler(fork.LastUpdated)
+					evenTable.AppendRow([]interface{}{fork.FullName, url, stars, fork.LastUpdated})
+				}
+				if *sortBy == "stars" || *sortBy == "lastUpdated" {
+					sortingHelper(evenTable, sortBy)
+				} else { // if sorting by ahead, the even table needs to be sorted by stars
+					*sortBy = "stars"
+					sortingHelper(evenTable, sortBy)
+					*sortBy = "ahead"
 				}
 				if even.Len() > 0 {
 					platformPrint(color.Notice, mitigate+"Forks up to date: "+strconv.Itoa(even.Len()))
@@ -370,23 +398,34 @@ func platformPrint(c *color.Theme, text string) {
 	}
 }
 
-func sortTable(table *list.List, order string) list.List {
-	if order == "desc" {
-		for e := table.Front(); e != nil; e = e.Next() {
-			for f := e.Next(); f != nil; f = f.Next() {
-				if e.Value.(Fork).AheadBy < f.Value.(Fork).AheadBy {
-					e.Value, f.Value = f.Value, e.Value
-				}
-			}
-		}
-	} else {
-		for e := table.Front(); e != nil; e = e.Next() {
-			for f := e.Next(); f != nil; f = f.Next() {
-				if e.Value.(Fork).BehindBy > f.Value.(Fork).BehindBy {
-					e.Value, f.Value = f.Value, e.Value
-				}
-			}
-		}
+func sortingHelper(mytable table.Writer, sortBy *string) table.Writer {
+	// sorts the table depending on the sortBy variable
+	if *sortBy == "stars" {
+		mytable.SortBy([]table.SortBy{
+			{Name: "Stars", Mode: table.Dsc},
+			{Name: "Ahead by", Mode: table.Asc},
+		})
+	} else if *sortBy == "lastUpdated" {
+		mytable.SortBy([]table.SortBy{
+			{Name: "Last Updated", Mode: table.Dsc},
+			{Name: "Ahead by", Mode: table.Asc},
+		})
+	} else if *sortBy == "ahead" {
+		mytable.SortBy([]table.SortBy{
+			{Name: "Ahead by", Mode: table.DscNumeric},
+			{Name: "Last Updated", Mode: table.Dsc},
+		})
+	} else if *sortBy == "behind" { // should not be reachable except if the sorting mode is ahead and we have to sort behind table
+		mytable.SortBy([]table.SortBy{
+			{Name: "Behind by", Mode: table.AscNumeric},
+		})
 	}
-	return *table
+	return mytable
+}
+
+func dateHandler(date string) string {
+	// converts the date to a readable format
+	date = strings.Replace(date, "T", " ", -1)
+	date = strings.Replace(date, "Z", "", -1)
+	return date
 }
