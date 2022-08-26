@@ -48,12 +48,12 @@ func main() {
 	success := "[✓] "
 	warning := "[!] "
 	working := "[+] "
-	mitigate := "[~] "
+	mitigate := "[?] "
 	parser := argparse.NewParser("gofork", "CLI tool to find active forks")
 	repo := parser.String("r", "repo", &argparse.Options{Required: true, Help: "Repository to check"})
 	branch := parser.String("b", "branch", &argparse.Options{Required: false, Help: "Branch to check", Default: "repo default branch"})
 	verboseFlag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show deleted and up to date repositories"})
-	page := parser.Int("p", "page", &argparse.Options{Help: "Page to check (use -1 for all)", Default: 1, Required: false})
+	pageInt := parser.Int("p", "page", &argparse.Options{Help: "Page to check (use -1 for all)", Default: 1, Required: false})
 	err := parser.Parse(os.Args)
 	if err != nil {
 		platformPrint(color.Warn, parser.Usage(err))
@@ -96,7 +96,7 @@ func main() {
 		platformPrint(color.Success, success+"Found "+*repo)
 		RepoInfo := getRepoInfo(*repo, auth.Token)
 		if *branch == "repo default branch" {
-			platformPrint(color.Notice, working+"No branch provided, using default branch")
+			platformPrint(color.Notice, mitigate+"No branch provided, using default branch")
 			*branch = RepoInfo.DefaultBranch
 		}
 		platformPrint(color.Notice, working+"Looking for "+*repo+":"+*branch)
@@ -111,37 +111,37 @@ func main() {
 			if pagesDecimal != float64(int(pagesDecimal)) {
 				pages = int(pages) + 1
 			}
-			if *page > pages {
+			if *pageInt > pages {
 				platformPrint(color.Warn, warning+"The page is out of range (max. "+strconv.Itoa(pages)+"), showing page 1")
-				*page = 1
+				*pageInt = 1
 			}
-			if RepoInfo.ForkCount > 100 && *page == 1 {
+			if RepoInfo.ForkCount > 100 && *pageInt == 1 {
 				RepoInfo.ForkCount = 100
 				// Force the loop to iterate over the selected page only
-				pages = *page
-				platformPrint(color.Info, mitigate+"More than 100 forks found, only showing first 100 (use -p to get other results)")
+				pages = *pageInt
+				platformPrint(color.Info, warning+"More than 100 forks found, only showing first 100 (use -p to get other results)")
 			}
-			if RepoInfo.ForkCount > 100 && *page > 1 {
+			if RepoInfo.ForkCount > 100 && *pageInt > 1 {
 				RepoInfo.ForkCount = 100
 				// Force the loop to iterate over the selected page only
-				pages = *page
-				platformPrint(color.Info, mitigate+"More than 100 forks found, showing page "+strconv.Itoa(*page))
+				pages = *pageInt
+				platformPrint(color.Info, warning+"More than 100 forks found, showing page "+strconv.Itoa(*pageInt))
 			}
-			if RepoInfo.ForkCount > 100 && *page == -1 {
-				platformPrint(color.Info, mitigate+"More than 100 forks found, showing page all pages because -p is used with -1")
+			if RepoInfo.ForkCount > 100 && *pageInt == -1 {
+				platformPrint(color.Info, warning+"More than 100 forks found, showing page all pages because -p is used with -1")
 			}
-			if *page < 1 {
-				if *page != -1 {
+			if *pageInt < 1 {
+				if *pageInt != -1 {
 					platformPrint(color.Warn, warning+"The number of page is lower than 1, showing page 1")
 					pages = 1
 					RepoInfo.ForkCount = 100
 				}
-				*page = 1
+				*pageInt = 1
 			}
 
 			ahead, behind, diverge, even, deleted := list.New(), list.New(), list.New(), list.New(), list.New()
 			bar := progressbar.Default(int64(RepoInfo.ForkCount))
-			for page := *page; page < pages+1; page++ {
+			for page := *pageInt; page < pages+1; page++ {
 				url := "https://api.github.com/repos/" + *repo + "/forks?per_page=" + strconv.Itoa(RepoInfo.ForkCount)
 				url = url + "&page=" + strconv.Itoa(page)
 				req, _ := http.NewRequest("GET", url, nil)
@@ -189,7 +189,7 @@ func main() {
 				aheadTable.SetStyle(table.StyleRounded)
 				aheadTable.Render()
 			} else {
-				platformPrint(color.Notice, mitigate+" No forks ahead of "+RepoInfo.Owner.Login+":"+*branch)
+				platformPrint(color.Notice, fail+" No forks ahead of "+RepoInfo.Owner.Login+":"+*branch)
 			}
 
 			divergeTable := table.NewWriter()
@@ -207,7 +207,7 @@ func main() {
 				divergeTable.SetStyle(table.StyleRounded)
 				divergeTable.Render()
 			} else {
-				platformPrint(color.Notice, mitigate+"No forks diverged of "+RepoInfo.Owner.Login+":"+*branch)
+				platformPrint(color.Notice, fail+"No forks diverged of "+RepoInfo.Owner.Login+":"+*branch)
 			}
 
 			behindTable := table.NewWriter()
@@ -224,7 +224,7 @@ func main() {
 				behindTable.SetStyle(table.StyleRounded)
 				behindTable.Render()
 			} else {
-				platformPrint(color.Notice, mitigate+"No forks behind of "+RepoInfo.Owner.Login+":"+*branch)
+				platformPrint(color.Notice, fail+"No forks behind of "+RepoInfo.Owner.Login+":"+*branch)
 			}
 
 			if *verboseFlag {
@@ -240,10 +240,11 @@ func main() {
 					evenTable.SetStyle(table.StyleRounded)
 					evenTable.Render()
 				} else {
-					platformPrint(color.Notice, mitigate+"No forks identical to "+RepoInfo.Owner.Login+":"+*branch)
+					platformPrint(color.Notice, fail+"No forks identical to "+RepoInfo.Owner.Login+":"+*branch)
 				}
 
 				deletedTable := table.NewWriter()
+				deletedTable.SetOutputMirror(os.Stdout)
 				deletedTable.AppendHeader(table.Row{"Fork", "URL"})
 				for e := deleted.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
@@ -255,7 +256,7 @@ func main() {
 					deletedTable.SetStyle(table.StyleRounded)
 					deletedTable.Render()
 				} else {
-					platformPrint(color.Notice, mitigate+"No deleted forks of "+RepoInfo.Owner.Login+":"+*branch)
+					platformPrint(color.Notice, fail+"No deleted forks of "+RepoInfo.Owner.Login+":"+*branch)
 				}
 			}
 
