@@ -61,14 +61,13 @@ func main() {
 	}
 
 	auth.Token = readConfig()
-	platformPrint(color.Error, auth.Token)
 	if auth.Token == "" {
 		// TODO: don't store token in plaintext
 		platformPrint(color.Error, "Please provide a PAT (https://tinyurl.com/GITHUBPAT) (Don't allow any scope, the token is stored in PLAINTEXT)")
 		input := getInput()
 		output := "{\"PAT\": \"" + input + "\"}"
 		writeConfig(output)
-		platformPrint(color.Success, "PAT saved to ")
+		platformPrint(color.Success, "PAT saved to"+getConfigFilePath())
 		auth.Token = readConfig()
 	}
 
@@ -246,20 +245,20 @@ func main() {
 				} else {
 					platformPrint(color.Notice, mitigate+"No forks identical to "+RepoInfo.Owner.Login+":"+*branch)
 				}
-				invalidTable := tablewriter.NewWriter(os.Stdout)
-				invalidTable.SetHeader([]string{"Fork", "URL"})
-				invalidMap := [][]string{}
+				deletedTable := tablewriter.NewWriter(os.Stdout)
+				deletedTable.SetHeader([]string{"Fork", "URL"})
+				deletedMap := [][]string{}
 				for e := deleted.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
 					url := "https://github.com" + string(fork.FullName)
-					invalidMap = append(invalidMap, []string{fork.FullName, url})
+					deletedMap = append(deletedMap, []string{fork.FullName, url})
 				}
-				for _, v := range invalidMap {
-					invalidTable.Append(v)
+				for _, v := range deletedMap {
+					deletedTable.Append(v)
 				}
 				if deleted.Len() > 0 {
 					platformPrint(color.Question, mitigate+"deleted forks: "+strconv.Itoa(deleted.Len()))
-					invalidTable.Render()
+					deletedTable.Render()
 				} else {
 					platformPrint(color.Notice, mitigate+"No deleted forks of "+RepoInfo.Owner.Login+":"+*branch)
 				}
