@@ -10,17 +10,19 @@ Gofork is a CLI tool to find forks that are ahead of a github repository.
 $ gofork --help
 usage: gofork [-h|--help] -r|--repo "<value>" [-b|--branch "<value>"]
               [-v|--verbose] [-p|--page <integer>] [-s|--sort "<value>"]
+              [-d|--deleteconfig]
 
               CLI tool to find active forks
 
 Arguments:
 
-  -h  --help     Print help information
-  -r  --repo     Repository to check
-  -b  --branch   Branch to check. Default: repo default branch
-  -v  --verbose  Show deleted and up to date repositories
-  -p  --page     Page to check (use -1 for all). Default: 1
-  -s  --sort     Sort by (stars, ahead, lastUpdated). Default: ahead
+  -h  --help          Print help information
+  -r  --repo          Repository to check
+  -b  --branch        Branch to check. Default: repo default branch
+  -v  --verbose       Show deleted and up to date repositories
+  -p  --page          Page to check (use -1 for all). Default: 1
+  -s  --sort          Sort by (stars, ahead, lastUpdated). Default: ahead
+  -d  --deleteconfig  Delete the config file
 ```
 
 ## Roadmap
