@@ -64,7 +64,13 @@ func main() {
 		os.Exit(1)
 	}
 	if *deleteconfigflag {
-		deleteConfig()
+		err := deleteConfig()
+		if err != nil {
+			platformPrint(color.Warn, fail+"Error deleting config file")
+			os.Exit(1)
+		} else {
+			platformPrint(color.Success, success+"Config file deleted")
+		}
 		os.Exit(0)
 	}
 	auth.Token = readConfig()
@@ -86,8 +92,13 @@ func main() {
 		platformPrint(color.Error, fail+"Incorrect PAT, do you want to delete config file? (y/n)")
 		input := getInput()
 		if input == "y" || input == "Y" {
-			deleteConfig()
-			platformPrint(color.Success, "PAT deleted")
+			err := deleteConfig()
+			if err != nil {
+				platformPrint(color.Warn, fail+"Error deleting config file")
+				os.Exit(1)
+			} else {
+				platformPrint(color.Success, success+"Config file deleted")
+			}
 			os.Exit(1)
 		} else if input == "n" || input == "N" {
 			platformPrint(color.Error, "Incorrect PAT provided exiting")
@@ -335,10 +346,13 @@ func writeConfig(token string) {
 
 }
 
-func deleteConfig() {
+func deleteConfig() error {
 	configFilePath := getConfigFilePath()
-	os.Remove(configFilePath)
-
+	err := os.Remove(configFilePath)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func getInput() string {
