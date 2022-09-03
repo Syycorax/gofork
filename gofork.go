@@ -57,12 +57,16 @@ func main() {
 	verboseFlag := parser.Flag("v", "verbose", &argparse.Options{Help: "Show deleted and up to date repositories"})
 	pageInt := parser.Int("p", "page", &argparse.Options{Help: "Page to check (use -1 for all)", Default: 1, Required: false})
 	sortBy := parser.String("s", "sort", &argparse.Options{Help: "Sort by (stars, ahead, lastUpdated)", Default: "ahead", Required: false})
+	deleteconfigflag := parser.Flag("d", "deleteconfig", &argparse.Options{Help: "Delete the config file"})
 	err := parser.Parse(os.Args)
 	if err != nil {
 		platformPrint(color.Warn, parser.Usage(err))
 		os.Exit(1)
 	}
-
+	if *deleteconfigflag {
+		deleteConfig()
+		os.Exit(0)
+	}
 	auth.Token = readConfig()
 	if auth.Token == "" {
 		// TODO: don't store token in plaintext
@@ -402,18 +406,15 @@ func sortingHelper(mytable table.Writer, sortBy *string) table.Writer {
 	// sorts the table depending on the sortBy variable
 	if *sortBy == "stars" {
 		mytable.SortBy([]table.SortBy{
-			{Name: "Stars", Mode: table.Dsc},
-			{Name: "Ahead by", Mode: table.Asc},
+			{Name: "Stars", Mode: table.DscNumeric},
 		})
 	} else if *sortBy == "lastUpdated" {
 		mytable.SortBy([]table.SortBy{
 			{Name: "Last Updated", Mode: table.Dsc},
-			{Name: "Ahead by", Mode: table.Asc},
 		})
 	} else if *sortBy == "ahead" {
 		mytable.SortBy([]table.SortBy{
 			{Name: "Ahead by", Mode: table.DscNumeric},
-			{Name: "Last Updated", Mode: table.Dsc},
 		})
 	} else if *sortBy == "behind" { // should not be reachable except if the sorting mode is ahead and we have to sort behind table
 		mytable.SortBy([]table.SortBy{
