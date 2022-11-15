@@ -33,7 +33,10 @@ Arguments:
 * [x] Verbose flag for private/even forks
 * [x] Loading bar
 * [X] Flag to sort output
-* [ ] ?
+* [X] Add branches to output
+* [ ] Flag to uninstall gofork
+* [ ] Fix the sorting algorithm
+
 
 ## Built with
 
