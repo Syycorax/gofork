@@ -15,6 +15,7 @@ import (
 	"github.com/gookit/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/schollz/progressbar/v3"
+	"golang.org/x/term"
 )
 
 type RepoInfo struct {
@@ -89,7 +90,7 @@ func main() {
 		platformPrint(color.Success, "PAT saved to"+getConfigFilePath())
 		auth.Token = readConfig()
 	}
-
+	
 	platformPrint(color.Notice, working+"Looking for "+*repo)
 	if RepoCheck(*repo, auth.Token) == 1 {
 		platformPrint(color.Error, fail+"Repository not found")
@@ -163,7 +164,7 @@ func main() {
 				*pageInt = 1
 			}
 
-			if *sortBy != "stars" && *sortBy != "ahead" && *sortBy != "lastUpdated"  && *sortBy != "branches" {
+			if *sortBy != "stars" && *sortBy != "ahead" && *sortBy != "lastUpdated" && *sortBy != "branches" {
 				platformPrint(color.Warn, warning+"The sort option is not valid, sortingHelper by ahead")
 				*sortBy = "ahead"
 			}
@@ -193,7 +194,7 @@ func main() {
 					body, _ = ioutil.ReadAll(resp.Body)
 					json.Unmarshal(body, &branches)
 					for range branches {
-						fork.branchNumber ++
+						fork.branchNumber++
 					}
 					if fork.Status == "ahead" {
 						ahead.PushBack(fork)
@@ -213,7 +214,7 @@ func main() {
 			platformPrint(color.Success, success+"sorting by "+*sortBy)
 			aheadTable := table.NewWriter()
 			aheadTable.SetOutputMirror(os.Stdout)
-			aheadTable.AppendHeader(table.Row{"Fork", "Ahead by", "URL", "Stars","Branches","Last updated"})
+			aheadTable.AppendHeader(table.Row{"Fork", "Ahead by", "URL", "Stars", "Branches", "Last updated"})
 			for e := ahead.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				aheadBy := strconv.Itoa(fork.AheadBy)
@@ -221,7 +222,7 @@ func main() {
 				stars := strconv.Itoa(fork.Stars) + " \033[33m\u2605" + "\033[0m"
 				branches := strconv.Itoa(fork.branchNumber)
 				LastUpdated := dateHandler(fork.LastUpdated)
-				aheadTable.AppendRow([]interface{}{fork.FullName, aheadBy, url, stars, branches,LastUpdated})
+				aheadTable.AppendRow([]interface{}{fork.FullName, aheadBy, url, stars, branches, LastUpdated})
 			}
 			sortingHelper(aheadTable, sortBy)
 			if ahead.Len() > 0 {
@@ -233,7 +234,7 @@ func main() {
 			}
 			divergeTable := table.NewWriter()
 			divergeTable.SetOutputMirror(os.Stdout)
-			divergeTable.AppendHeader(table.Row{"Fork", "Ahead by", "Behind by", "URL", "Stars","Branches", "Last Updated"})
+			divergeTable.AppendHeader(table.Row{"Fork", "Ahead by", "Behind by", "URL", "Stars", "Branches", "Last Updated"})
 			for e := diverge.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				aheadBy := strconv.Itoa(fork.AheadBy)
@@ -255,7 +256,7 @@ func main() {
 
 			behindTable := table.NewWriter()
 			behindTable.SetOutputMirror(os.Stdout)
-			behindTable.AppendHeader(table.Row{"Fork", "Behind by", "URL", "Stars", "Branches","Last updated"})
+			behindTable.AppendHeader(table.Row{"Fork", "Behind by", "URL", "Stars", "Branches", "Last updated"})
 			for e := behind.Front(); e != nil; e = e.Next() {
 				fork := e.Value.(Fork)
 				behindBy := strconv.Itoa(fork.BehindBy)
@@ -263,7 +264,7 @@ func main() {
 				stars := strconv.Itoa(fork.Stars) + " \033[33m\u2605" + "\033[0m"
 				branches := strconv.Itoa(fork.branchNumber)
 				LastUpdated := dateHandler(fork.LastUpdated)
-				behindTable.AppendRow([]interface{}{fork.FullName, behindBy, url, stars,branches, LastUpdated})
+				behindTable.AppendRow([]interface{}{fork.FullName, behindBy, url, stars, branches, LastUpdated})
 			}
 			if *sortBy == "ahead" { // if sorting by ahead, the behind table needs to be sorted by behind by
 				*sortBy = "behind"
@@ -282,14 +283,14 @@ func main() {
 
 			if *verboseFlag {
 				evenTable := table.NewWriter()
-				evenTable.AppendHeader(table.Row{"Fork", "URL", "Stars","Branches","Last updated"})
+				evenTable.AppendHeader(table.Row{"Fork", "URL", "Stars", "Branches", "Last updated"})
 				for e := even.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
 					url := "https://github.com" + string(fork.FullName)
 					stars := strconv.Itoa(fork.Stars) + " \033[33m\u2605" + "\033[0m"
 					branches := strconv.Itoa(fork.branchNumber)
 					fork.LastUpdated = dateHandler(fork.LastUpdated)
-					evenTable.AppendRow([]interface{}{fork.FullName, url, stars,branches, fork.LastUpdated})
+					evenTable.AppendRow([]interface{}{fork.FullName, url, stars, branches, fork.LastUpdated})
 				}
 				if *sortBy == "stars" || *sortBy == "lastUpdated" {
 					sortingHelper(evenTable, sortBy)
@@ -308,7 +309,7 @@ func main() {
 
 				deletedTable := table.NewWriter()
 				deletedTable.SetOutputMirror(os.Stdout)
-				deletedTable.AppendHeader(table.Row{"Fork", "URL","Stars","Branches","Last updated"})
+				deletedTable.AppendHeader(table.Row{"Fork", "URL", "Stars", "Branches", "Last updated"})
 				for e := deleted.Front(); e != nil; e = e.Next() {
 					fork := e.Value.(Fork)
 					url := "https://github.com" + string(fork.FullName)
