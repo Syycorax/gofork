@@ -143,16 +143,16 @@ func main() {
 				RepoInfo.ForkCount = 100
 				// Force the loop to iterate over the selected page only
 				pages = *pageInt
-				platformPrint(color.Info, warning+"More than 100 forks found, only showing first 100 (use -p to get other results)")
+				platformPrint(color.Notice, warning+"More than 100 forks found, only showing first 100 (use -p to get other results)")
 			}
 			if RepoInfo.ForkCount > 100 && *pageInt > 1 {
 				RepoInfo.ForkCount = 100
 				// Force the loop to iterate over the selected page only
 				pages = *pageInt
-				platformPrint(color.Info, warning+"More than 100 forks found, showing page "+strconv.Itoa(*pageInt))
+				platformPrint(color.Notice, warning+"More than 100 forks found, showing page "+strconv.Itoa(*pageInt))
 			}
 			if RepoInfo.ForkCount > 100 && *pageInt == -1 {
-				platformPrint(color.Info, warning+"More than 100 forks found, showing page all pages because -p is used with -1")
+				platformPrint(color.Notice, warning+"More than 100 forks found, showing page all pages because -p is used with -1")
 			}
 			if *pageInt < 1 {
 				if *pageInt != -1 {
