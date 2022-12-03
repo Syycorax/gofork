@@ -90,7 +90,9 @@ func main() {
 		platformPrint(color.Success, "PAT saved to"+getConfigFilePath())
 		auth.Token = readConfig()
 	}
-	
+	a, b, _ := term.GetSize((int(os.Stdin.Fd())))
+	platformPrint(color.Info, working+"DEBUG: Terminal window handle: "+strconv.Itoa(int(os.Stdin.Fd())))
+	platformPrint(color.Info, working+"DEBUG: Terminal window size: "+strconv.Itoa(a)+"x"+strconv.Itoa(b))
 	platformPrint(color.Notice, working+"Looking for "+*repo)
 	if RepoCheck(*repo, auth.Token) == 1 {
 		platformPrint(color.Error, fail+"Repository not found")
