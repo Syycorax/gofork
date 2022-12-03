@@ -114,7 +114,7 @@ func main() {
 			os.Exit(1)
 		}
 	} else if RepoCheck(*repo, auth.Token) == 3 {
-		platformPrint(color.Error, fail+"Unknow error")
+		platformPrint(color.Error, fail+"Unknown error")
 
 	} else {
 		platformPrint(color.Success, success+"Found "+*repo)
